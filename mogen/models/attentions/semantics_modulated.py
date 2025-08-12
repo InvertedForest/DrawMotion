@@ -199,7 +199,7 @@ class SemanticsModulatedAttention(nn.Module):
         cond_type [text, both, stick, none].sum() == batch_size
         """
         # B, T, D
-        if type(mid_query) is torch.Tensor:
+        if type(mid_query) is torch.Tensor or type(mid_query) is nn.Parameter:
             _query = self.y_encoder(mid_query, x, src_mask)
             y = x + self.proj_out(_query, other_emb)
             return y
@@ -228,7 +228,7 @@ class SemanticsModulatedAttention(nn.Module):
         query[:ci[2]] = query[:ci[2]] + text_y
         query[ci[1]:ci[3]] = query[ci[1]:ci[3]] + stick_y
 
-        if mid_query == -1:
+        if type(mid_query) == int and mid_query == -1:
             return x, query
         '''
         b_query = query[:ci[1]]

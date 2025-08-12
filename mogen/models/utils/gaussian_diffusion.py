@@ -1,12 +1,13 @@
 """
 This code is borrowed from https://github.com/openai/guided-diffusion/blob/main/guided_diffusion/gaussian_diffusion.py
 """
-
+import os
 import enum
 import math
 
 import numpy as np
 import torch as th
+import torch.optim as optim
 
 
 from abc import ABC, abstractmethod
@@ -431,8 +432,8 @@ class GaussianDiffusion:
 
     def q_posterior_mean_variance(self, x_start, x_t, t):
         """
-        Compute the mean and variance of the diffusion posterior:
-
+        Compute the mean and variance of the ddpm diffusion posterior:
+        not suitable for ddim
             q(x_{t-1} | x_t, x_0)
 
         """
@@ -1276,7 +1277,9 @@ def guidance_loss(pred_motion, **kwargs):
     motion_mask = kwargs['motion_mask'] # [b, T]
     pred_joint = recover_from_ric(pred_motion.double(), joints_num=joints_num, ifnorm=True) # [B, T, J, 3]
     pred_locus = pred_joint[:, :, 0, [0,2]]/1000 # [B, T, 2]
-    locus_loss = ((pred_locus - gt_locus) * motion_mask[..., None]).pow(2).mean(dim=(1,2)).sum() # * motion_mask.sum()
+    # locus_loss = ((pred_locus - gt_locus) * motion_mask[..., None]).abs().mean(dim=(1,2)).sum() # * motion_mask.sum()
+    # locus_loss = ((pred_locus - gt_locus) * motion_mask[..., None]).pow(2).mean(dim=(1,2)).sum() # * motion_mask.sum() or sqrt TODO
+    locus_loss = ((pred_locus - gt_locus) * motion_mask[..., None]).pow(2).sum(-1).add(1e-8).sqrt().mean(-1).sum() # * motion_mask.sum() or sqrt TODO
 
     loss = locus_loss
     return loss
@@ -1295,32 +1298,49 @@ class _WrappedModel:
         new_ts = map_tensor[ts]
         cur_step = new_ts[0].item()
         guidance = kwargs['guidance']
+        # guidance.manual = False
         if guidance.repeat == 0:
             return self.model(x, new_ts, **kwargs)
         else:
             with th.no_grad():
                 h, mid_query = self.model(x, new_ts, mid_res=-1, **kwargs)  # Get initial model output
+                np.save(f'.vscode/save_mid_query/{cur_step}_{np.random.randint(10000)}.npy', mid_query.detach().cpu().numpy())
             # guidance.repeat = 10
+            if not guidance.manual:
+                mid_query = th.nn.Parameter(mid_query.detach().clone(), requires_grad=True)
+                optimizer = th.optim.SGD([mid_query], lr=guidance.scale)
             for i in range(guidance.repeat):
                 with th.enable_grad():
-                    mid_query = mid_query.detach().clone()
-                    mid_query.requires_grad_(True)
-                    h = h.detach().clone()
-                    h.requires_grad_(False)
-                    th.cuda.empty_cache()
-                    _model_out = self.model(x, new_ts, mid_res=(h, mid_query),  **kwargs) # TODO return mid_res
-                    loss = guidance_loss(_model_out, **kwargs) # TODO, first, set target is 0 to verify
+                    if guidance.manual:
+                        mid_query = mid_query.detach().clone()
+                        mid_query.requires_grad_(True)
+                        h = h.detach().clone()
+                        h.requires_grad_(False)
+                    else:
+                        optimizer.zero_grad()
+                    _model_out = self.model(x, new_ts, mid_res=(h, mid_query),  **kwargs)
+                    loss = guidance_loss(_model_out, **kwargs)
                     # loss.backward()
-                    mid_query_grad = th.autograd.grad(loss, mid_query, retain_graph=False)[0]
-                    mid_query = mid_query - mid_query_grad * guidance.scale
-                    mid_query = mid_query.detach().clone()
-                    mid_query.requires_grad_(False)
-                    th.cuda.empty_cache()
+                    if guidance.manual:
+                        mid_query_grad = th.autograd.grad(loss, mid_query, retain_graph=False)[0]
+                        if False:
+                        # if True:
+                            # print(f'{cur_step} {i} {mid_query.mean().item():e} {mid_query.std().item():e} {mid_query.grad.mean().item():e} {mid_query.grad.std().item():e}', file=open('mean.txt', 'a'))
+                            print(f'{cur_step} {i} {mid_query.mean().item():e} {mid_query.std().item():e} {mid_query_grad.abs().mean().item():e} {mid_query_grad.abs().std().item():e} {loss.item():e}', file=open(f'.vscode/vis/dist{guidance.repeat}_{guidance.layer_num}_{guidance.scale}.txt', 'a'))
+                        mid_query = mid_query - mid_query_grad * guidance.scale
+                        mid_query = mid_query.detach().clone()
+                        mid_query.requires_grad_(False)
+                    else:
+                        loss.backward()
+                        if False:
+                        # if True:
+                            # print(f'{cur_step} {i} {mid_query.mean().item():e} {mid_query.std().item():e} {mid_query.grad.mean().item():e} {mid_query.grad.std().item():e}', file=open('mean.txt', 'a'))
+                            print(f'{cur_step} {i} {mid_query.mean().item():e} {mid_query.std().item():e} {mid_query.grad.abs().mean().item():e} {mid_query.grad.abs().std().item():e} {loss.item():e}', file=open(f'.vscode/vis/dist{guidance.repeat}_{guidance.layer_num}_{guidance.scale}.txt', 'a'))
+                        optimizer.step()
             with th.no_grad():
-                model_out = self.model(x, new_ts, mid_res=(h, mid_query), **kwargs) # TODO. detact update_res and forward
+                model_out = self.model(x, new_ts, mid_res=(h, mid_query), **kwargs)
             # clean cuda memory
             model_out = model_out.detach().clone()
-            del h, mid_query, _model_out, loss, mid_query_grad
             th.cuda.empty_cache()
                 
             return model_out

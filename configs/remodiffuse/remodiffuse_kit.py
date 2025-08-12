@@ -91,9 +91,11 @@ model = dict(
         locus_w=1.0,
     ),
     guidance=dict(
-        repeat=3,
-        layer_num=2,
-        scale=1
+        repeat=10,
+        layer_num=3,
+        scale=10,
+        # manual=False,
+        manual=True,
     ),
     index_num=index_num,
     motion_crop=[4, 4+20*9],

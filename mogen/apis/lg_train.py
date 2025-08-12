@@ -18,7 +18,8 @@ class LgModel(LightningModule):
         self.model = build_architecture(cfg.model)
         self.dataset = dataset
         self.outputs = []
-        self.unit = unit
+        self.unit = unit 
+        self.val_step = -1
 
     
     # def on_train_epoch_start(self) -> None:
@@ -58,6 +59,8 @@ class LgModel(LightningModule):
         return all_loss
     
     def validation_step(self, batch):
+        self.val_step += 1
+        if self.trainer.max_steps > 0 and self.val_step > self.trainer.max_steps - 1: return
         output = self.model(return_loss=False, **batch)
         self.outputs.append(output)
 
@@ -81,10 +84,35 @@ class LgModel(LightningModule):
             ordered_results = ordered_results[:len(self.dataset)]
             print(f'StiSim:{1-evalute_sim(ordered_results, joints_num=21)/evalute_mean(ordered_results, joints_num=21)}')
             print(f'LoDist:{evalute_locus(ordered_results, joints_num=21)}')
+            print(f'traj error:{evalute_trajectory_error(ordered_results, joints_num=21)}')
             results = self.dataset.evaluate(ordered_results)
             for k, v in results.items():
                 print(f'\n{k} : {v:.4f}')
 
+
+def evalute_trajectory_error(results, joints_num):
+    
+    dis_list = []
+    for result in results:
+        length = result['motion_length'].item()
+        gt_motion = result['motion'][:length]
+        pred_motion = result['pred_motion'][:length]
+        gt_joint = recover_from_ric(gt_motion, joints_num=joints_num, ifnorm=True)
+        pred_joint = recover_from_ric(pred_motion, joints_num=joints_num, ifnorm=True) 
+        # gt_locus = gt_joint[:,0]/1000
+        # pred_locus = pred_joint[:,0]/1000
+        gt_locus = gt_joint[:,0,[0,2]]/1000
+        pred_locus = pred_joint[:,0,[0,2]]/1000
+        dist = (pred_locus - gt_locus).pow(2).sum(-1).sqrt() # [motion_length]
+        dist_mean = dist.mean() # [1]
+        traj_fail_02 = (dist_mean > 0.2).float()
+        traj_fail_05 = (dist_mean > 0.5).float()
+        all_fail_02 = (dist > 0.2).float().mean()
+        all_fail_05 = (dist > 0.5).float().mean()
+        dis_list.append([traj_fail_02.item(), traj_fail_05.item(), all_fail_02.item(), all_fail_05.item(), dist_mean.item()])
+
+    traj_error = torch.tensor(dis_list).mean().item()
+    return traj_error
 
 def evalute_locus(results, joints_num):
     
@@ -95,11 +123,11 @@ def evalute_locus(results, joints_num):
         pred_motion = result['pred_motion'][:length]
         gt_joint = recover_from_ric(gt_motion, joints_num=joints_num, ifnorm=True)
         pred_joint = recover_from_ric(pred_motion, joints_num=joints_num, ifnorm=True) 
-        gt_locus = gt_joint[:,0,[0,2]]
-        pred_locus = pred_joint[:,0,[0,2]]
+        gt_locus = gt_joint[:,0,[0,2]]/1000
+        pred_locus = pred_joint[:,0,[0,2]]/1000
         dist = (pred_locus - gt_locus).pow(2).sum(-1).sqrt().mean()
         dis_list.append(dist.item())
-    return sum(dis_list)/len(dis_list)/1000
+    return sum(dis_list)/len(dis_list)
 
 def evalute_sim(results, joints_num):
     
