@@ -93,7 +93,7 @@ model = dict(
     guidance=dict(
         repeat=10,
         layer_num=3,
-        scale=10,
+        scale=50,
         # manual=False,
         manual=True,
     ),

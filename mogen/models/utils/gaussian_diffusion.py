@@ -1292,8 +1292,28 @@ class _WrappedModel:
         self.model = model
         self.timestep_map = timestep_map
         self.original_num_steps = original_num_steps
+        # torch.save({'miu': step_miu.cpu(), 'sigma': step_sigma.cpu(), 'sigma_inv': sigma_inv}, midquery_path+'/mid_query_ana.pt')
+        path = '.vscode/save_mid_query/mid_query_ana.pt'
+        data = th.load(path, map_location='cpu')
+        self.step_miu = data['miu']
+        self.step_sigma = data['sigma']
+        self.sigma_inv = data['sigma_inv']
+        self.m_steps = data['steps']
+
+    def to(self, x):
+        deivce = x.device
+        dtype = x.dtype
+        _device = self.step_miu.device
+        _dtype = self.step_miu.dtype
+        self.threshold = 1 
+        if deivce != _device or dtype != _dtype:
+            self.step_miu = self.step_miu.to(device=deivce, dtype=dtype)
+            self.step_sigma = self.step_sigma.to(device=deivce, dtype=dtype)
+            self.sigma_inv = self.sigma_inv.to(device=deivce, dtype=dtype)
+            self.m_steps = self.m_steps.to(device=deivce, dtype=dtype)
 
     def __call__(self, x, ts, **kwargs):
+        self.to(x)
         map_tensor = th.tensor(self.timestep_map, device=ts.device, dtype=ts.dtype)
         new_ts = map_tensor[ts]
         cur_step = new_ts[0].item()
@@ -1304,8 +1324,15 @@ class _WrappedModel:
         else:
             with th.no_grad():
                 h, mid_query = self.model(x, new_ts, mid_res=-1, **kwargs)  # Get initial model output
-                np.save(f'.vscode/save_mid_query/{cur_step}_{np.random.randint(10000)}.npy', mid_query.detach().cpu().numpy())
-            # guidance.repeat = 10
+                ori_mid_query = mid_query.detach().clone()
+                # np.save(f'.vscode/save_mid_query/{cur_step}_{np.random.randint(10000)}.npy', mid_query.detach().cpu().numpy())
+                index = th.where(self.m_steps==cur_step)[0].item()
+                miu = self.step_miu[index]
+                sigma_inv = self.sigma_inv[index]
+                diff = mid_query - miu
+                ori_d_M = ((diff @ sigma_inv) * diff).sum(-1).sqrt()    
+                
+
             if not guidance.manual:
                 mid_query = th.nn.Parameter(mid_query.detach().clone(), requires_grad=True)
                 optimizer = th.optim.SGD([mid_query], lr=guidance.scale)
@@ -1330,6 +1357,11 @@ class _WrappedModel:
                         mid_query = mid_query - mid_query_grad * guidance.scale
                         mid_query = mid_query.detach().clone()
                         mid_query.requires_grad_(False)
+                        grad = mid_query - ori_mid_query
+                        diff = mid_query - miu
+                        d_M = ((diff @ sigma_inv) * diff).sum(-1).sqrt()    
+                        d_M_mask = ((d_M-ori_d_M) < self.threshold) * 0.5 + 0.5
+                        mid_query = ori_mid_query + grad * d_M_mask[..., None]
                     else:
                         loss.backward()
                         if False:
