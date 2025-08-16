@@ -71,9 +71,9 @@ def pose_vis(pose, fig, idx, title, joints_num=21):
         ax.scatter(x, y, z, s=10, color=[float(i)/255 for i in [30, 30, 30]])  
         ax.text(x, y, z, f'{i}', size=7, zorder=1, color='green')  
 
-    ax.set_xlabel('0')  
-    ax.set_ylabel('1')  
-    ax.set_zlabel('2') 
+    ax.set_xlabel('-2')  
+    ax.set_ylabel('-0')  
+    ax.set_zlabel('1') 
     ax.set_aspect('equal', adjustable='box')
     # ax.view_init(elev=10, azim=10)
     ax.view_init(elev=0, azim=0)

@@ -77,6 +77,9 @@ ff_size = 1024
 num_heads = 8
 dropout = 0.
 index_num = 3
+stickman_encoder_path = 'stickman/weight/real_init/t2m/stickman_encoder.ckpt'
+stickman_decoder_path = 'stickman/weight/real_init/t2m/stickman_decoder.ckpt'
+stickman_all_path = 'stickman/logs/human_ml3d/fix_init/last.ckpt'
 
 # model settings
 model = dict(
@@ -86,6 +89,15 @@ model = dict(
         # index_w=0
         stickman_w=1.0,
         locus_w=1.0,
+    ),
+    guidance=dict(
+        repeat=0,
+        layer_num=3,
+        scale=50,
+        locus_w=0.0,
+        stick_w=1.0,
+        # manual=False,
+        manual=True,
     ),
     index_num=index_num,
     motion_crop=[4, 4+21*9],
@@ -128,7 +140,7 @@ model = dict(
         ),
         multistick_encoder=dict(
             stick_encoder = stick_set['stickman_encoder'],
-            weight='stickman/weight/real_init/t2m/stickman_encoder.ckpt',
+            weight=stickman_encoder_path,
             d_model=feat_dim,
             out_dim=latent_dim,
             ),

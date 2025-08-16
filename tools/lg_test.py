@@ -72,7 +72,10 @@ def main():
     args.work_dir = Path(args.ckpt).parent
     # args.config = args.work_dir / 'remodiffuse_t2m.py'
     # args.config = args.work_dir / 'remodiffuse_kit.py'
-    args.config = 'configs/remodiffuse/remodiffuse_kit.py'
+    if 'kit' in args.ckpt:
+        args.config = 'configs/remodiffuse/remodiffuse_kit.py'
+    else:
+        args.config = 'configs/remodiffuse/remodiffuse_t2m.py'
 
     cfg = Config.fromfile(args.config)
     cfg.data.test.test_mode = True
@@ -96,8 +99,8 @@ def main():
                       devices=parse_gpu(args.gpu),
                       logger=False, 
                     #   max_steps=1,
-                    #   precision='bf16-mixed',
-                      precision='16-mixed',
+                      precision='bf16-mixed',
+                    #   precision='16-mixed',
                       inference_mode=False,
                       )
     trainer.validate(model, test_loader, ckpt_path=args.ckpt)

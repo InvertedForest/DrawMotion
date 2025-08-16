@@ -74,6 +74,30 @@ def recover_root_rot_pos(data): #[b,T,D]
     r_pos[..., 1] = data[..., 3]
     return r_rot_quat.to(data.dtype), r_pos.to(data.dtype)
 
+def rel_joint_from_ric(data, joints_num, ifnorm=False):
+    '''
+    return [b, T, J-1, 3] since the root joint is [0,0,0]
+    '''
+    if ifnorm:
+        if joints_num == 21:
+            mean = mean_kit
+            std = std_kit
+        if joints_num == 22:
+            mean = mean_t2m
+            std = std_t2m
+        mean = mean[(None,) * (len(data.shape)-1) + (...,)].to(data.device).to(data.dtype)
+        std = std[(None,) * (len(data.shape)-1) + (...,)].to(data.device).to(data.dtype)
+        data1 = data.clone() * std + mean
+    else:
+        data1 = data
+    rel_joints = data1[..., 4:(joints_num - 1) * 3 + 4]
+    rel_joints = rel_joints.view(rel_joints.shape[:-1] + (-1, 3))
+    # height
+    height = data1[..., 3] # [B]
+    rel_joints[..., 1] -= height[..., None] # [B, T, J-1, 3]
+    rel_joints = torch.cat([torch.zeros(rel_joints.shape[:-2] + (1, 3), device=rel_joints.device), rel_joints], dim=-2) # [B, T, J, 3]
+    return rel_joints
+
 
 def recover_from_ric(data, joints_num, ifnorm=False):
     if ifnorm:

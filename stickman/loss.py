@@ -5,7 +5,10 @@ import numpy as np
 class SLoss(nn.Module):
     def __init__(self, cfg):
         super().__init__()   
-        dataset_name = cfg.train.dataset_name 
+        if isinstance(cfg, str):
+            dataset_name = cfg
+        else:
+            dataset_name = cfg.train.dataset_name 
         if dataset_name == 'human_ml3d':
             # self.spine_idx = [12, 9, 3, 0] # spine
             self.spine_idx = [12, 6, 0] # spine
@@ -45,8 +48,14 @@ class SLoss(nn.Module):
         chain_mask.pop(0)
         chain = torch.tensor(chain)
         chain_mask = torch.tensor(chain_mask)
+
+        # limb
+        main_limb = torch.tensor(self.limbs_idx[:,1:])
+        
+        
         self.register_buffer('chain', chain)
         self.register_buffer('chain_mask', chain_mask)
+        self.register_buffer('main_limb', main_limb)
                     
                 
         
@@ -90,3 +99,34 @@ class SLoss(nn.Module):
         )
         
         return  loss
+
+    def align_forward(self, pred_pose, stick_pose):
+        '''
+        pred_pose: [b,  22, 3]
+        stick_pose: [b, 4, 22, 3]
+        '''
+        # pred_offset = pred_pose[:,:,self.chain[1:]] - pred_pose[:,:,self.chain[:-1]] # [b, c, n, 3]
+        # gt_offset = stick_pose[:,self.chain[1:]] - stick_pose[:,self.chain[:-1]] # [b, n, 3]
+        # align_loss = (pred_offset - gt_offset[:,None]).pow(2).mean(dim=tuple(range(pred_offset.dim()-1)))
+        pred_pose_length = torch.norm(pred_pose[:,self.main_limb[:,1:]] - pred_pose[:,self.main_limb[:,:-1]], dim=-1).mean(dim=(1,2)) # [b]
+        stick_pose_length = torch.norm(stick_pose[:,:,self.main_limb[:,1:]] - stick_pose[:,:,self.main_limb[:,:-1]], dim=-1).mean(dim=(2,3)) # [b,4]
+        # aligned_stick_pose = (pred_pose_length[...,None,None,None] / stick_pose_length[...,None,None]) * stick_pose
+        # loss = self.forward(None, predict_pose=aligned_stick_pose.clone().detach(), gt_pose=pred_pose)
+        aligned_pred_pose = (stick_pose_length.mean(-1)[..., None, None] / pred_pose_length[...,None,None]) * pred_pose
+        # loss = self.forward(None, predict_pose=stick_pose.clone().detach(), gt_pose=aligned_pred_pose)
+        # return loss['candidate_loss'] * stick_pose.shape[0]
+        pred_offset = aligned_pred_pose[:,self.chain[1:]] - aligned_pred_pose[:,self.chain[:-1]] # [b, c, n, 3]
+        stick_offset = stick_pose[:,:,self.chain[1:]] - stick_pose[:,:,self.chain[:-1]] # [b, n, 3]
+        l2_distance = (pred_offset[:,None] - stick_offset).pow(2)*self.chain_mask[None,None,:,None] # [b, c, n, 3]
+        # l2_loss = l2_distance[...,[0,1,2]].abs().mean([2,3])
+        l2_loss = l2_distance[...,[0,1,2]].sum(-1).add(1e-4).sqrt().mean(-1)
+        # l2_loss = l2_distance[...,[0,2]].abs().mean([2,3])
+        loss = l2_loss.min(-1)[0].sum()
+        return loss
+
+        
+        '''
+        from stickman.eval_with_eye import *
+        pose = pred_pose[0,None].clone().detach().float().cpu().numpy()
+        eval_vis(pose=pose)
+        '''

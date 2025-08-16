@@ -58,9 +58,30 @@ class LgModel(LightningModule):
         self.log('all_loss', all_loss, on_step=True, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
         return all_loss
     
+    def on_validation_epoch_start(self):
+        self.stickman_model = StickModel.load_from_checkpoint(self.cfg.stickman_all_path, map_location=self.device, cfg=self.cfg.stick_set, strict=False)
+        return super().on_validation_epoch_start()
+    
     def validation_step(self, batch):
+        # lightning not support max_steps in validation, so we use val_step to control the number of steps
         self.val_step += 1
         if self.trainer.max_steps > 0 and self.val_step > self.trainer.max_steps - 1: return
+        # add stickman feature to avoid redundant computation
+        track = batch['stickman_tracks']
+        B, T, *E = track.shape
+        track  = track.reshape(B*T, *E)
+        stickman_feat, pred_motion = self.stickman_model(track)
+        stickman_feat = stickman_feat.reshape(B, T, *stickman_feat.shape[1:])
+        pred_motion = pred_motion.reshape(B, T, *pred_motion.shape[1:])
+        # batch['stickman_emb'] = stickman_feat
+        pred_motion = (pred_motion[..., 1:, :] - pred_motion[..., 1, None, :]).detach() # [B, T, 4, J-1, 3]
+        pred_motion = torch.cat([torch.zeros(B,T,4,1,3, device=pred_motion.device), pred_motion], dim=-2) # [B, T, 4, J, 3]tc
+        batch['stick_joints'] = pred_motion
+        # done
+        '''
+        from stickman.eval_with_eye import *
+        '''
+        
         output = self.model(return_loss=False, **batch)
         self.outputs.append(output)
 
@@ -81,10 +102,11 @@ class LgModel(LightningModule):
             ordered_results = []
             for res in zip(*part_list):
                 ordered_results.extend(list(res))
+            joints_num = 22
             ordered_results = ordered_results[:len(self.dataset)]
-            print(f'StiSim:{1-evalute_sim(ordered_results, joints_num=21)/evalute_mean(ordered_results, joints_num=21)}')
-            print(f'LoDist:{evalute_locus(ordered_results, joints_num=21)}')
-            print(f'traj error:{evalute_trajectory_error(ordered_results, joints_num=21)}')
+            print(f'StiSim:{1-evalute_sim(ordered_results, joints_num=joints_num)/evalute_mean(ordered_results, joints_num=joints_num)}')
+            print(f'LoDist:{evalute_locus(ordered_results, joints_num=joints_num)}')
+            print(f'traj error:{evalute_trajectory_error(ordered_results, joints_num=joints_num)}')
             results = self.dataset.evaluate(ordered_results)
             for k, v in results.items():
                 print(f'\n{k} : {v:.4f}')
@@ -163,3 +185,23 @@ def evalute_mean(results,joints_num):
 
 # (evalute_sim(ordered_results, joints_num=21), evalute_mean(ordered_results, joints_num=21))
 # 1-evalute_sim(ordered_results, joints_num=21)/evalute_mean(ordered_results, joints_num=21)
+
+
+from stickman.model import StickmanEncoder, StickmanDecoder
+
+class StickModel(LightningModule):
+
+    def __init__(self, cfg):
+        super().__init__()
+        self.stickman_encoder = StickmanEncoder(cfg.stickman_encoder)
+        # self.motion_encoder = MotionEncoder(cfg.motion_encoder)
+        self.stickman_decoder = StickmanDecoder(cfg.stickman_decoder)
+
+    def forward(self, track):
+        """
+        track: [B, 6, 64, 2]
+        """
+        stickman_feat = self.stickman_encoder(track)
+        predict_pose = self.stickman_decoder(stickman_feat)
+        
+        return stickman_feat, predict_pose

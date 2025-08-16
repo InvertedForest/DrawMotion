@@ -80,6 +80,9 @@ ff_size = 1024
 num_heads = 8
 dropout = 0.
 index_num = 3
+stickman_encoder_path = 'stickman/weight/kit_ml/split_weight/stickman_encoder.ckpt'
+stickman_decoder_path = 'stickman/weight/kit_ml/split_weight/stickman_decoder.ckpt'
+stickman_all_path = 'stickman/logs/kit_ml/fix_init/last.ckpt'
 
 # model settings
 model = dict(
@@ -94,6 +97,8 @@ model = dict(
         repeat=10,
         layer_num=3,
         scale=50,
+        locus_w=0.0,
+        stick_w=1.0,
         # manual=False,
         manual=True,
     ),
@@ -138,7 +143,7 @@ model = dict(
         ),
         multistick_encoder=dict(
             stick_encoder = stick_set['stickman_encoder'],
-            weight='stickman/weight/kit_ml/split_weight/stickman_encoder.ckpt',
+            weight=stickman_encoder_path,
             d_model=feat_dim,
             out_dim=latent_dim,
             ),

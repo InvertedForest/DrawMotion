@@ -13,7 +13,7 @@ import torch.optim as optim
 from abc import ABC, abstractmethod
 import torch.distributed as dist
 
-from mogen.utils.plot_utils import recover_from_ric
+from mogen.utils.plot_utils import recover_from_ric, rel_joint_from_ric
 
 
 def create_named_schedule_sampler(name, diffusion):
@@ -1269,23 +1269,11 @@ class SpacedDiffusion(GaussianDiffusion):
             return model
         return _WrappedModel(model, self.timestep_map, self.original_num_steps)
 
-def guidance_loss(pred_motion, **kwargs):
-    # return th.abs(model_out).mean()  # Placeholder for guidance verification
-    # locus
-    joints_num = 21 if pred_motion.shape[-1] == 251 else 22
-    gt_locus = kwargs['locus']/1000 # [b, T, 2]
-    motion_mask = kwargs['motion_mask'] # [b, T]
-    pred_joint = recover_from_ric(pred_motion.double(), joints_num=joints_num, ifnorm=True) # [B, T, J, 3]
-    pred_locus = pred_joint[:, :, 0, [0,2]]/1000 # [B, T, 2]
-    # locus_loss = ((pred_locus - gt_locus) * motion_mask[..., None]).abs().mean(dim=(1,2)).sum() # * motion_mask.sum()
-    # locus_loss = ((pred_locus - gt_locus) * motion_mask[..., None]).pow(2).mean(dim=(1,2)).sum() # * motion_mask.sum() or sqrt TODO
-    locus_loss = ((pred_locus - gt_locus) * motion_mask[..., None]).pow(2).sum(-1).add(1e-8).sqrt().mean(-1).sum() # * motion_mask.sum() or sqrt TODO
 
-    loss = locus_loss
-    return loss
 
 
     
+from stickman.loss import SLoss
 
 class _WrappedModel:
     def __init__(self, model, timestep_map, original_num_steps):
@@ -1301,17 +1289,52 @@ class _WrappedModel:
         self.m_steps = data['steps']
 
     def to(self, x):
-        deivce = x.device
+        device = x.device
         dtype = x.dtype
         _device = self.step_miu.device
         _dtype = self.step_miu.dtype
         self.threshold = 1 
-        if deivce != _device or dtype != _dtype:
-            self.step_miu = self.step_miu.to(device=deivce, dtype=dtype)
-            self.step_sigma = self.step_sigma.to(device=deivce, dtype=dtype)
-            self.sigma_inv = self.sigma_inv.to(device=deivce, dtype=dtype)
-            self.m_steps = self.m_steps.to(device=deivce, dtype=dtype)
+        dim = x.shape[-1]
+        if not hasattr(self, 'guiance_tool'):
+            dataset_name = 'kit_ml' if dim == 251 else 'human_ml3d'
+            self.guiance_tool = SLoss(cfg=dataset_name).to(device)
+        if device != _device or dtype != _dtype:
+            self.step_miu = self.step_miu.to(device=device, dtype=dtype)
+            self.step_sigma = self.step_sigma.to(device=device, dtype=dtype)
+            self.sigma_inv = self.sigma_inv.to(device=device, dtype=dtype)
+            self.m_steps = self.m_steps.to(device=device, dtype=dtype)
 
+    def guidance_loss(self, pred_motion, **kwargs):
+        # return th.abs(model_out).mean()  # Placeholder for guidance verification
+        guidance = kwargs['guidance']
+        joints_num = 21 if pred_motion.shape[-1] == 251 else 22
+        motion_mask = kwargs['motion_mask'] # [b, T]
+        # locus
+        gt_locus = kwargs['locus']/1000 # [b, T, 2]
+        pred_abs_joint = recover_from_ric(pred_motion.float(), joints_num=joints_num, ifnorm=True) # [B, T, J, 3]
+        pred_locus = pred_abs_joint[:, :, 0, [0,2]]/1000 # [B, T, 2]
+        # locus_loss = ((pred_locus - gt_locus) * motion_mask[..., None]).abs().mean(dim=(1,2)).sum() # * motion_mask.sum()
+        # locus_loss = ((pred_locus - gt_locus) * motion_mask[..., None]).pow(2).mean(dim=(1,2)).sum() # * motion_mask.sum() or sqrt TODO
+        locus_loss = ((pred_locus - gt_locus) * motion_mask[..., None]).pow(2).sum(-1).add(1e-8).sqrt().mean(-1).sum() # * motion_mask.sum() or sqrt 
+
+        # stickman
+        stick_mask = (kwargs['stick_mask'][...,0] == 1) # [b, T, 1]
+        pred_joints = rel_joint_from_ric(pred_motion.float()[stick_mask], joints_num=joints_num, ifnorm=True)/1000 # [b, 1, J, 3]
+        stick_joints = kwargs['stick_joints'][stick_mask] # [b, 4, J, 3]
+        stick_loss = self.guiance_tool.align_forward(pred_joints, stick_joints)
+        # stick_loss = min_dist.sum()/1000
+            
+        
+        loss = locus_loss * guidance.locus_w + stick_loss * guidance.stick_w
+        '''
+        from stickman.eval_with_eye import *
+        pose = stick_joints[0][0].clone().detach().float().cpu().numpy()
+        aa = np.zeros((1,21,3))
+        aa[0,1:] = pose
+        eval_vis(pose=aa)
+        '''
+        return loss
+    
     def __call__(self, x, ts, **kwargs):
         self.to(x)
         map_tensor = th.tensor(self.timestep_map, device=ts.device, dtype=ts.dtype)
@@ -1326,7 +1349,11 @@ class _WrappedModel:
                 h, mid_query = self.model(x, new_ts, mid_res=-1, **kwargs)  # Get initial model output
                 ori_mid_query = mid_query.detach().clone()
                 # np.save(f'.vscode/save_mid_query/{cur_step}_{np.random.randint(10000)}.npy', mid_query.detach().cpu().numpy())
+                if (self.m_steps == cur_step).sum().item() != 1:
+                    raise ValueError(f'cur_step {cur_step} not in m_steps {self.m_steps}')
                 index = th.where(self.m_steps==cur_step)[0].item()
+                if index < 0 or index >= len(self.step_miu):
+                    raise ValueError(f'index {index} out of range for step_miu {len(self.step_miu)}')
                 miu = self.step_miu[index]
                 sigma_inv = self.sigma_inv[index]
                 diff = mid_query - miu
@@ -1346,7 +1373,7 @@ class _WrappedModel:
                     else:
                         optimizer.zero_grad()
                     _model_out = self.model(x, new_ts, mid_res=(h, mid_query),  **kwargs)
-                    loss = guidance_loss(_model_out, **kwargs)
+                    loss = self.guidance_loss(_model_out, **kwargs)
                     # loss.backward()
                     if guidance.manual:
                         mid_query_grad = th.autograd.grad(loss, mid_query, retain_graph=False)[0]

@@ -183,6 +183,7 @@ class MotionDiffusion(BaseArchitecture):
                 'guidance': self.guidance,
                 **model_kwargs,
             }
+            model_kwargs['stick_joints'] = kwargs.get('stick_joints', None)
             inference_kwargs = kwargs.get('inference_kwargs', {})
             if self.inference_type == 'ddpm':
                 output = self.diffusion_test.p_sample_loop(
