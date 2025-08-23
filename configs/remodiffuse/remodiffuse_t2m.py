@@ -91,11 +91,11 @@ model = dict(
         locus_w=1.0,
     ),
     guidance=dict(
-        repeat=0,
+        repeat=10,
         layer_num=3,
         scale=50,
-        locus_w=0.0,
-        stick_w=1.0,
+        locus_w=1.0,
+        stick_w=0.0,
         # manual=False,
         manual=True,
     ),
@@ -149,7 +149,7 @@ model = dict(
             latent_dim=locus_dim
             ),
         scale_func_cfg=dict(
-            coarse_scale=2.0,
+            coarse_scale=1.0,
             both_coef=0.52351,
             text_coef=-0.28419,
             retr_coef=2.39872

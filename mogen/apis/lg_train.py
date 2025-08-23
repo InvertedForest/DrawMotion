@@ -22,10 +22,10 @@ class LgModel(LightningModule):
         self.val_step = -1
 
     
-    # def on_train_epoch_start(self) -> None:
-    #     self.model.others_cuda()
+    def on_train_epoch_start(self) -> None:
+        self.model.others_cuda()
 
-    #     torch.cuda.empty_cache()
+        # torch.cuda.empty_cache()
     #     device = self.device
     #     free_memory, total_memory = torch.cuda.mem_get_info(device)
     #     dtype = torch.uint8
@@ -102,7 +102,7 @@ class LgModel(LightningModule):
             ordered_results = []
             for res in zip(*part_list):
                 ordered_results.extend(list(res))
-            joints_num = 22
+            joints_num = 21 if res[0]['motion'].shape[-1] == 251 else 22
             ordered_results = ordered_results[:len(self.dataset)]
             print(f'StiSim:{1-evalute_sim(ordered_results, joints_num=joints_num)/evalute_mean(ordered_results, joints_num=joints_num)}')
             print(f'LoDist:{evalute_locus(ordered_results, joints_num=joints_num)}')
@@ -121,10 +121,9 @@ def evalute_trajectory_error(results, joints_num):
         pred_motion = result['pred_motion'][:length]
         gt_joint = recover_from_ric(gt_motion, joints_num=joints_num, ifnorm=True)
         pred_joint = recover_from_ric(pred_motion, joints_num=joints_num, ifnorm=True) 
-        # gt_locus = gt_joint[:,0]/1000
-        # pred_locus = pred_joint[:,0]/1000
-        gt_locus = gt_joint[:,0,[0,2]]/1000
-        pred_locus = pred_joint[:,0,[0,2]]/1000
+        scale = 1000 if joints_num == 21 else 1
+        gt_locus = gt_joint[:,0,[0,2]]/scale
+        pred_locus = pred_joint[:,0,[0,2]]/scale
         dist = (pred_locus - gt_locus).pow(2).sum(-1).sqrt() # [motion_length]
         dist_mean = dist.mean() # [1]
         traj_fail_02 = (dist_mean > 0.2).float()
@@ -145,8 +144,9 @@ def evalute_locus(results, joints_num):
         pred_motion = result['pred_motion'][:length]
         gt_joint = recover_from_ric(gt_motion, joints_num=joints_num, ifnorm=True)
         pred_joint = recover_from_ric(pred_motion, joints_num=joints_num, ifnorm=True) 
-        gt_locus = gt_joint[:,0,[0,2]]/1000
-        pred_locus = pred_joint[:,0,[0,2]]/1000
+        scale = 1000 if joints_num == 21 else 1
+        gt_locus = gt_joint[:,0,[0,2]]/scale
+        pred_locus = pred_joint[:,0,[0,2]]/scale
         dist = (pred_locus - gt_locus).pow(2).sum(-1).sqrt().mean()
         dis_list.append(dist.item())
     return sum(dis_list)/len(dis_list)

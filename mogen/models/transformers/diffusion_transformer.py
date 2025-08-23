@@ -243,7 +243,8 @@ class DiffusionTransformer(BaseModule, metaclass=ABCMeta):
         """
         motion: B, T, D
         """
-        B, T = motion.shape[0], motion.shape[1]
+        B, T, D = motion.shape[0], motion.shape[1], motion.shape[2]
+        kwargs['motion_dim'] = D
         conditions = self.get_precompute_condition(device=motion.device, **kwargs)
         if len(motion_mask.shape) == 2:
             src_mask = motion_mask.clone().unsqueeze(-1)

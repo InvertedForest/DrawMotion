@@ -138,6 +138,7 @@ class MotionDiffusion(BaseArchitecture):
             start = 0
             
             joints_num = 21 if motion.shape[-1] == 251 else 22
+            scale = 1000 if motion.shape[-1] == 251 else 1
             for i, batch in enumerate(p_batch):
                 if loss_item[i] in {'both_loss', 'stick_loss'}:
 
@@ -152,8 +153,8 @@ class MotionDiffusion(BaseArchitecture):
                     
                     # locus
                     pred_joint = recover_from_ric(pred[start:start+batch], joints_num=joints_num, ifnorm=True) # [B, T, J, 3]
-                    pred_locus = pred_joint[:, :, 0, [0,2]]/1000 # [B, T, 2]
-                    gt_locus = locus[start:start+batch]/1000 # [B, T, 2]
+                    pred_locus = pred_joint[:, :, 0, [0,2]]/scale # [B, T, 2]
+                    gt_locus = locus[start:start+batch]/scale # [B, T, 2]
                     locus_diff = (gt_locus - pred_locus).pow(2).mean(-1) # [B, T]
                     mask_l = motion_mask[start:start+batch] # [B, T]
                     locus_loss = (locus_diff * mask_l).sum(-1) / (1 + mask_l.sum(-1)) # [B]

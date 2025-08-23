@@ -192,7 +192,7 @@ class SemanticsModulatedAttention(nn.Module):
         self.proj_out = StylizationBlock(latent_dim, time_embed_dim, dropout)
     # from line_profiler import profile
     # @profile
-    def forward(self, x, text_emb, stick_emb, other_emb, src_mask, cond_type, stick_mask, locus_emb, mid_query):
+    def forward(self, x, text_emb, stick_emb, other_emb, src_mask, cond_type, stick_mask, locus_emb, mid_query=None):
         """
         x: B, T, D
         xf: B, N, L # text features; re_dict: retrieval information

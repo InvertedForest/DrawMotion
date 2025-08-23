@@ -1308,18 +1308,19 @@ class _WrappedModel:
         # return th.abs(model_out).mean()  # Placeholder for guidance verification
         guidance = kwargs['guidance']
         joints_num = 21 if pred_motion.shape[-1] == 251 else 22
+        scale = 1000 if pred_motion.shape[-1] == 251 else 1
         motion_mask = kwargs['motion_mask'] # [b, T]
         # locus
-        gt_locus = kwargs['locus']/1000 # [b, T, 2]
+        gt_locus = kwargs['locus']/scale # [b, T, 2]
         pred_abs_joint = recover_from_ric(pred_motion.float(), joints_num=joints_num, ifnorm=True) # [B, T, J, 3]
-        pred_locus = pred_abs_joint[:, :, 0, [0,2]]/1000 # [B, T, 2]
+        pred_locus = pred_abs_joint[:, :, 0, [0,2]]/scale # [B, T, 2]
         # locus_loss = ((pred_locus - gt_locus) * motion_mask[..., None]).abs().mean(dim=(1,2)).sum() # * motion_mask.sum()
         # locus_loss = ((pred_locus - gt_locus) * motion_mask[..., None]).pow(2).mean(dim=(1,2)).sum() # * motion_mask.sum() or sqrt TODO
         locus_loss = ((pred_locus - gt_locus) * motion_mask[..., None]).pow(2).sum(-1).add(1e-8).sqrt().mean(-1).sum() # * motion_mask.sum() or sqrt 
 
         # stickman
         stick_mask = (kwargs['stick_mask'][...,0] == 1) # [b, T, 1]
-        pred_joints = rel_joint_from_ric(pred_motion.float()[stick_mask], joints_num=joints_num, ifnorm=True)/1000 # [b, 1, J, 3]
+        pred_joints = rel_joint_from_ric(pred_motion.float()[stick_mask], joints_num=joints_num, ifnorm=True)/scale # [b, 1, J, 3]
         stick_joints = kwargs['stick_joints'][stick_mask] # [b, 4, J, 3]
         stick_loss = self.guiance_tool.align_forward(pred_joints, stick_joints)
         # stick_loss = min_dist.sum()/1000

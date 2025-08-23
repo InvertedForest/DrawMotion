@@ -432,6 +432,7 @@ class ReMoDiffuseTransformer(DiffusionTransformer):
                                  clip_feat=None,
                                  locus_emb=None,
                                  locus=None,
+                                 motion_dim=None,
                                  **kwargs):
         B, T = stickman_tracks.shape[0], stickman_tracks.shape[1]
         if xf_out is None:
@@ -443,7 +444,8 @@ class ReMoDiffuseTransformer(DiffusionTransformer):
         if locus_emb is None:
             motion_length_x = torch.cat([motion_length[:,None].expand(-1, T, 1), self.len_pos[None,:T,None].expand(B, -1, -1)], dim=-1)
             motion_length_x = motion_length_x/100 - 1  # B, T, 2
-            locus_x = locus/100 # *(-1) # B, T, 2
+            scale = 100 if motion_dim == 251 else 1
+            locus_x = locus/scale # *(-1) # B, T, 2
             locus_x = torch.cat([locus_x, motion_length_x], dim=-1) # B, T, 4
             locus_emb = self.encode_locus(locus_x)  # B, T, latent_dim
         output['locus_emb'] = locus_emb
