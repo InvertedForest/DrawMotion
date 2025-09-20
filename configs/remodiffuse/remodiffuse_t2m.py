@@ -91,8 +91,8 @@ model = dict(
         locus_w=1.0,
     ),
     guidance=dict(
-        repeat=10,
-        layer_num=3,
+        repeat=50,
+        layer_num=5,
         scale=50,
         locus_w=1.0,
         stick_w=0.0,

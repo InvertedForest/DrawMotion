@@ -99,8 +99,8 @@ def main():
                       devices=parse_gpu(args.gpu),
                       logger=False, 
                     #   max_steps=1,
-                      precision='bf16-mixed',
-                    #   precision='16-mixed',
+                    #   precision='bf16-mixed',
+                      precision='16-mixed',
                       inference_mode=False,
                       )
     trainer.validate(model, test_loader, ckpt_path=args.ckpt)
@@ -109,6 +109,6 @@ def main():
 if __name__ == '__main__':
     main()
 
-# python tools/lg_test.py  /root/StickMotion/logs/kit_ml/tp_attn1/last.ckpt -1
 
-# python tools/lg_test.py /root/StickMotion/logs/kit_ml/tp_init/last.ckpt 2
+# python tools/lg_test.py /root/StickMotion/logs/kit_ml/tp_attn3/last.ckpt -1
+# python  tools/lg_test.py  /root/StickMotion/logs/human_ml3d/tp_attn3_cond_locus/last.ckpt -1

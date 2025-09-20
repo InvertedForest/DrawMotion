@@ -14,7 +14,7 @@ train_pipeline = [
 ]
 
 data = dict(
-    samples_per_gpu=256,
+    samples_per_gpu=200,
     workers_per_gpu=10,
     train=dict(
         type='RepeatDataset',
@@ -45,7 +45,7 @@ data = dict(
         crop_size=crop_size,
         eval_cfg=dict(
             shuffle_indexes=True,
-            replication_times=2,
+            replication_times=10,
             replication_reduction='statistics',
             text_encoder_name='human_ml3d',
             text_encoder_path='data/evaluators/human_ml3d/finest.tar',

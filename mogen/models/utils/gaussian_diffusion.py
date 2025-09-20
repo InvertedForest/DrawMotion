@@ -1278,28 +1278,35 @@ from stickman.loss import SLoss
 class _WrappedModel:
     def __init__(self, model, timestep_map, original_num_steps):
         self.model = model
+        if self.model.input_feats == 251:
+            dataset = 'kit' 
+        elif self.model.input_feats == 263:
+            dataset = 't2m'
+        else:
+            raise NotImplementedError(self.model.input_feats)
         self.timestep_map = timestep_map
         self.original_num_steps = original_num_steps
         # torch.save({'miu': step_miu.cpu(), 'sigma': step_sigma.cpu(), 'sigma_inv': sigma_inv}, midquery_path+'/mid_query_ana.pt')
-        path = '.vscode/save_mid_query/mid_query_ana.pt'
+        path = f'.vscode/mid_query/{dataset}/mid_query_ana.pt' 
+        # path = '.vscode/mid_query/t2m/mid_query_ana.pt' 
         data = th.load(path, map_location='cpu')
-        self.step_miu = data['miu']
+        self.step_mu = data['miu']
         self.step_sigma = data['sigma']
         self.sigma_inv = data['sigma_inv']
         self.m_steps = data['steps']
+        self.threshold = 1 
 
     def to(self, x):
         device = x.device
         dtype = x.dtype
-        _device = self.step_miu.device
-        _dtype = self.step_miu.dtype
-        self.threshold = 1 
+        _device = self.step_mu.device
+        _dtype = self.step_mu.dtype
         dim = x.shape[-1]
         if not hasattr(self, 'guiance_tool'):
             dataset_name = 'kit_ml' if dim == 251 else 'human_ml3d'
             self.guiance_tool = SLoss(cfg=dataset_name).to(device)
         if device != _device or dtype != _dtype:
-            self.step_miu = self.step_miu.to(device=device, dtype=dtype)
+            self.step_mu = self.step_mu.to(device=device, dtype=dtype)
             self.step_sigma = self.step_sigma.to(device=device, dtype=dtype)
             self.sigma_inv = self.sigma_inv.to(device=device, dtype=dtype)
             self.m_steps = self.m_steps.to(device=device, dtype=dtype)
@@ -1318,12 +1325,13 @@ class _WrappedModel:
         # locus_loss = ((pred_locus - gt_locus) * motion_mask[..., None]).pow(2).mean(dim=(1,2)).sum() # * motion_mask.sum() or sqrt TODO
         locus_loss = ((pred_locus - gt_locus) * motion_mask[..., None]).pow(2).sum(-1).add(1e-8).sqrt().mean(-1).sum() # * motion_mask.sum() or sqrt 
 
-        # stickman
-        stick_mask = (kwargs['stick_mask'][...,0] == 1) # [b, T, 1]
-        pred_joints = rel_joint_from_ric(pred_motion.float()[stick_mask], joints_num=joints_num, ifnorm=True)/scale # [b, 1, J, 3]
-        stick_joints = kwargs['stick_joints'][stick_mask] # [b, 4, J, 3]
-        stick_loss = self.guiance_tool.align_forward(pred_joints, stick_joints)
-        # stick_loss = min_dist.sum()/1000
+        # # stickman
+        # stick_mask = (kwargs['stick_mask'][...,0] == 1) # [b, T, 1]
+        # pred_joints = rel_joint_from_ric(pred_motion.float()[stick_mask], joints_num=joints_num, ifnorm=True)/scale # [b, 1, J, 3]
+        # stick_joints = kwargs['stick_joints'][stick_mask] # [b, 4, J, 3]
+        # stick_loss = self.guiance_tool.align_forward(pred_joints, stick_joints)
+        # # stick_loss = min_dist.sum()/1000
+        stick_loss = 0
             
         
         loss = locus_loss * guidance.locus_w + stick_loss * guidance.stick_w
@@ -1349,15 +1357,17 @@ class _WrappedModel:
             with th.no_grad():
                 h, mid_query = self.model(x, new_ts, mid_res=-1, **kwargs)  # Get initial model output
                 ori_mid_query = mid_query.detach().clone()
-                # np.save(f'.vscode/save_mid_query/{cur_step}_{np.random.randint(10000)}.npy', mid_query.detach().cpu().numpy())
+                # repeat, scale = 1, 0
+                # np.save(f'.vscode/mid_query/kit/{cur_step}_{np.random.randint(10000)}.npy', mid_query.detach().cpu().numpy())
+                # np.save(f'.vscode/mid_query/t2m/{cur_step}_{np.random.randint(10000)}.npy', mid_query.detach().cpu().numpy())
                 if (self.m_steps == cur_step).sum().item() != 1:
                     raise ValueError(f'cur_step {cur_step} not in m_steps {self.m_steps}')
                 index = th.where(self.m_steps==cur_step)[0].item()
-                if index < 0 or index >= len(self.step_miu):
-                    raise ValueError(f'index {index} out of range for step_miu {len(self.step_miu)}')
-                miu = self.step_miu[index]
+                if index < 0 or index >= len(self.step_mu):
+                    raise ValueError(f'index {index} out of range for step_miu {len(self.step_mu)}')
+                mu = self.step_mu[index]
                 sigma_inv = self.sigma_inv[index]
-                diff = mid_query - miu
+                diff = mid_query - mu
                 ori_d_M = ((diff @ sigma_inv) * diff).sum(-1).sqrt()    
                 
 
@@ -1386,7 +1396,7 @@ class _WrappedModel:
                         mid_query = mid_query.detach().clone()
                         mid_query.requires_grad_(False)
                         grad = mid_query - ori_mid_query
-                        diff = mid_query - miu
+                        diff = mid_query - mu
                         d_M = ((diff @ sigma_inv) * diff).sum(-1).sqrt()    
                         d_M_mask = ((d_M-ori_d_M) < self.threshold) * 0.5 + 0.5
                         mid_query = ori_mid_query + grad * d_M_mask[..., None]

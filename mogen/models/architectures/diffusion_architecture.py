@@ -174,7 +174,7 @@ class MotionDiffusion(BaseArchitecture):
             return loss
         else:
             dim_pose = kwargs['motion'].shape[-1]
-            model_kwargs = self.model.get_precompute_condition(device=motion.device,  **kwargs)
+            model_kwargs = self.model.get_precompute_condition(device=motion.device, motion_dim=dim_pose, **kwargs)
             model_kwargs={
                 'motion_mask': motion_mask,
                 'motion_length': motion_length,
@@ -232,6 +232,7 @@ vis_motion = [pred_motion[pred_id, None].double(), gt_motion[gt_id, None].double
 stick_motion_vis(stickman[start_or_end], vis_motion, res['text'])
 
 # blender
+# 3D
 res = results[209]
 motion_length = res['motion_length'].item()
 # motion = res['pred_motion'][:motion_length]
@@ -239,19 +240,26 @@ motion = res['motion'][:motion_length]
 np.save('/root/StickMotion/joint.npy', motion2joint(motion, joints_num=22))
 scp local_container:joint.npy C:\\Users\\16587\\Desktop\\joint.npy
 
-res = results[67]
-motion_length = res['motion_length'].item()
-motion = res['pred_motion'][:motion_length]
-threed2rot(motion2joint(motion))
-# scp local_container:all_infor.pkl C:\\Users\\16587\\Desktop\\all_infor.pkl
-
+# rot
 res = results[67]
 motion_length = res['motion_length'].item()
 motion = res['pred_motion'][:motion_length]
 threed2rot(motion2joint(motion, joints_num=22))
 # scp local_container:all_infor.pkl C:\\Users\\16587\\Desktop\\all_infor.pkl
 
-
+# both
+res = results[100]
+index = torch.where(res['stick_mask']==1)[0]
+stickmans = res['stickman_tracks'][index]
+motion_length = res['motion_length'].item()
+gt_motion = res['motion'][:motion_length]
+gt_joint = motion2joint(gt_motion, joints_num=22)
+gt_traj = 
+pred_motion = res['pred_motion'][:motion_length]
+pred_joint = motion2joint(pred_motion, joints_num=22)
+pred_rot = threed2rot(pred_joint)
 np.save('/root/StickMotion/joint.npy', joint)
-scp local_container:/root/StickMotion/joint.npy C:\\Users\\16587\\Desktop\\joint.npy
+
+scp compshare:/root/StickMotion/joint.npy C:\\Users\\16587\\Desktop\\joint.npy
+scp compshare:/root/StickMotion/all_infor.pkl C:\\Users\\16587\\Desktop\\all_infor.pkl
 '''

@@ -138,6 +138,8 @@ def main():
     
     lr_monitor = LearningRateMonitor(logging_interval='step')
     model = LgModel(cfg)
+    para_m = sum(p.numel() for p in model.parameters()) / 1_000_000
+    print(f'Parameters: {para_m:.2f}M')
     train_loader = DataLoader(dataset, batch_size=cfg.data.samples_per_gpu, shuffle=True, num_workers=cfg.data.workers_per_gpu, collate_fn=collate_fn)
     trainer = Trainer(accelerator="gpu", 
                       strategy=DDPStrategy(),

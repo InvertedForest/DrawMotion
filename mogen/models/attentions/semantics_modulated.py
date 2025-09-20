@@ -225,6 +225,23 @@ class SemanticsModulatedAttention(nn.Module):
         text_y = self.text_encoder(text_query, text_x, text_emb, text_x_mask, 1)
         stick_y = self.stick_encoder(stick_query, stick_x, stick_emb, stick_x_mask, stick_mask)
 
+        # indices = torch.randperm(query.size(0))
+
+        # indices = torch.arange(query.size(0)).long().to(query.device)
+        # indices = torch.cat((indices[-1:], indices[:-1]), dim=0)
+
+        # ind_len = query.size(0)
+        # repeat = 4
+        # s_len = ind_len//repeat
+        # ss_len = s_len - (s_len + 1)//2
+        # indices = torch.arange(s_len).long().to(query.device)
+        # indices[s_len-ss_len:] = indices[:ss_len]
+        # indices = torch.cat([indices+i*s_len for i in range(repeat)], dim=0)
+
+        # _query = query[indices]
+        # _query = _query.contiguous()
+        # query = query + (_query - query).detach() * 0.9
+
         query[:ci[2]] = query[:ci[2]] + text_y
         query[ci[1]:ci[3]] = query[ci[1]:ci[3]] + stick_y
 

@@ -82,7 +82,9 @@ class LgModel(LightningModule):
         from stickman.eval_with_eye import *
         '''
         
+        # import time; time1 = time.time()
         output = self.model(return_loss=False, **batch)
+        # print('model time:', time.time() - time1)
         self.outputs.append(output)
 
     # def on_validation_end(self) -> None:
