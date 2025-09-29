@@ -390,10 +390,10 @@ class ReMoDiffuseTransformer(DiffusionTransformer):
                     'none_coef': 1 - 2*w
                 }
             # output = {
-            #     'both_coef': 2*w,
-            #     'text_coef': 0,
+            #     'both_coef': 0,
+            #     'text_coef': w,
             #     'retr_coef': 0,
-            #     'none_coef': 1 - 2*w
+            #     'none_coef': 1-w
             # }
         else:
             both_coef = self.scale_func_cfg['both_coef']
@@ -406,6 +406,7 @@ class ReMoDiffuseTransformer(DiffusionTransformer):
                 'retr_coef': retr_coef,
                 'none_coef': none_coef
             }
+            # cover
             output = {
                 'both_coef': 1.0,
                 'text_coef': 0.,
@@ -436,6 +437,7 @@ class ReMoDiffuseTransformer(DiffusionTransformer):
                                  **kwargs):
         B, T = stickman_tracks.shape[0], stickman_tracks.shape[1]
         if xf_out is None:
+            text = [i['text'] for i in kwargs['motion_metas']] # TODO
             xf_out = self.encode_text(text, clip_feat, device)
         output = {'xf_out': xf_out}
         if  stickman_emb is None:

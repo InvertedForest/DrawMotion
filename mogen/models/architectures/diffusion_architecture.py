@@ -210,56 +210,36 @@ class MotionDiffusion(BaseArchitecture):
             results = kwargs
             results['pred_motion'] = output["sample"]
             results = self.split_results(results)
+            
+            '''
+            #### for visualization ####
+            import numpy as np
+            import pickle
+            from stickman.eval_with_eye import eval_vis, motion2joint
+            from blender.deal_joint import threed2rot
+
+            joints_num = 22
+            res = results[0]
+            index = torch.where(res['stick_mask']==1)[0]
+            stickmans = res['stickman_tracks'][index].cpu().numpy()
+            motion_length = res['motion_length'].item()
+            gt_motion = res['motion'][:motion_length]
+            gt_joint = motion2joint(gt_motion, joints_num=joints_num)
+            gt_traj = res['gt_locus'][:motion_length].cpu().numpy()
+            pred_motion = res['pred_motion'][:motion_length]
+            pred_joint = motion2joint(pred_motion, joints_num=joints_num)
+            pred_rot = threed2rot(pred_joint)
+            eval_vis(track=stickmans, joints_num=joints_num)
+            res_dict = {}
+            res_dict['stickmans'] = stickmans
+            res_dict['stickmans_index'] = index.cpu().numpy()
+            res_dict['text'] = res['text']
+            res_dict['gt_traj'] = gt_traj
+            res_dict['pred_joint'] = pred_joint
+            res_dict['pred_rot'] = pred_rot
+
+            pickle.dump(res_dict, open('/root/StickMotion/all_infor.pkl', "wb"))
+            # scp compshare:/root/StickMotion/all_infor.pkl C:\\Users\\16587\\Desktop\\all_infor.pkl
+            '''
+            
             return results
-
-'''
-from stickman.eval_with_eye import *
-from blender.deal_joint import threed2rot
-
-[i['text'] for i in results]
-[(id, i['text']) for id, i in enumerate(results) if 'jump' in i['text']]
-
-res = results[14]
-pred_index = res['pred_index']
-specified_idx = res['specified_idx']
-pred_motion = res['pred_motion']
-gt_motion = res['motion']
-mask = res['motion_mask']
-stickman = res['stickman_tracks']
-start_or_end = 1
-pred_id = pred_index.max(0)[1][start_or_end].item(); gt_id = specified_idx[start_or_end].item()
-vis_motion = [pred_motion[pred_id, None].double(), gt_motion[gt_id, None].double()]
-stick_motion_vis(stickman[start_or_end], vis_motion, res['text'])
-
-# blender
-# 3D
-res = results[209]
-motion_length = res['motion_length'].item()
-# motion = res['pred_motion'][:motion_length]
-motion = res['motion'][:motion_length]
-np.save('/root/StickMotion/joint.npy', motion2joint(motion, joints_num=22))
-scp local_container:joint.npy C:\\Users\\16587\\Desktop\\joint.npy
-
-# rot
-res = results[67]
-motion_length = res['motion_length'].item()
-motion = res['pred_motion'][:motion_length]
-threed2rot(motion2joint(motion, joints_num=22))
-# scp local_container:all_infor.pkl C:\\Users\\16587\\Desktop\\all_infor.pkl
-
-# both
-res = results[100]
-index = torch.where(res['stick_mask']==1)[0]
-stickmans = res['stickman_tracks'][index]
-motion_length = res['motion_length'].item()
-gt_motion = res['motion'][:motion_length]
-gt_joint = motion2joint(gt_motion, joints_num=22)
-gt_traj = 
-pred_motion = res['pred_motion'][:motion_length]
-pred_joint = motion2joint(pred_motion, joints_num=22)
-pred_rot = threed2rot(pred_joint)
-np.save('/root/StickMotion/joint.npy', joint)
-
-scp compshare:/root/StickMotion/joint.npy C:\\Users\\16587\\Desktop\\joint.npy
-scp compshare:/root/StickMotion/all_infor.pkl C:\\Users\\16587\\Desktop\\all_infor.pkl
-'''

@@ -87,7 +87,7 @@ model = dict(
     loss_weight=dict(
         # motion_w=0,
         # index_w=0
-        stickman_w=1.0,
+        stickman_w=0.0,
         locus_w=1.0,
     ),
     guidance=dict(

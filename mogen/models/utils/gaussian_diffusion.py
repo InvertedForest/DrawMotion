@@ -1398,7 +1398,8 @@ class _WrappedModel:
                         grad = mid_query - ori_mid_query
                         diff = mid_query - mu
                         d_M = ((diff @ sigma_inv) * diff).sum(-1).sqrt()    
-                        d_M_mask = ((d_M-ori_d_M) < self.threshold) * 0.5 + 0.5
+                        _lambda = 0.01
+                        d_M_mask = ((d_M-ori_d_M) < self.threshold) * (1 - _lambda) + _lambda
                         mid_query = ori_mid_query + grad * d_M_mask[..., None]
                     else:
                         loss.backward()

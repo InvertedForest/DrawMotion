@@ -8,6 +8,7 @@ from lightning.fabric.fabric import Fabric
 import os
 import time
 from mogen.utils.plot_utils import recover_from_ric
+import numpy as np
 
 class LgModel(LightningModule):
 
@@ -67,6 +68,9 @@ class LgModel(LightningModule):
         self.val_step += 1
         if self.trainer.max_steps > 0 and self.val_step > self.trainer.max_steps - 1: return
         # add stickman feature to avoid redundant computation
+        
+        '''
+        #### for stickman training free guidance #####
         track = batch['stickman_tracks']
         B, T, *E = track.shape
         track  = track.reshape(B*T, *E)
@@ -77,9 +81,29 @@ class LgModel(LightningModule):
         pred_motion = (pred_motion[..., 1:, :] - pred_motion[..., 1, None, :]).detach() # [B, T, 4, J-1, 3]
         pred_motion = torch.cat([torch.zeros(B,T,4,1,3, device=pred_motion.device), pred_motion], dim=-2) # [B, T, 4, J, 3]tc
         batch['stick_joints'] = pred_motion
-        # done
         '''
-        from stickman.eval_with_eye import *
+        
+
+        '''
+        ##### for interaction demo #####
+        batch['motion_metas'][0]['text'] = 'A person walked casually.'
+        batch['motion_metas'][0]['token'] = None
+        traj = np.load('.vscode/interaction/poly_traj.npy')
+        stickm = np.load('.vscode/interaction/stickman_input.npy')
+        leng = traj.shape[0]
+        # locus
+        batch['locus'][0][:leng] = torch.tensor(traj)
+        # motion mask
+        batch['motion_mask'][0, :leng] = 1
+        batch['motion_mask'][0, leng:] = 0
+        batch['motion_length'][0] = leng
+        batch['clip_feat'] = None
+        # stickman
+        stick_index = 70
+        batch['stick_mask'][0, ...] = 0
+        batch['stick_mask'][0, stick_index, 0] = 1
+        batch['stickman_tracks'][0, stick_index] = torch.tensor(stickm)
+
         '''
         
         # import time; time1 = time.time()
