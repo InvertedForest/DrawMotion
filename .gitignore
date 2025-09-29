@@ -136,6 +136,7 @@ logs/
 *.obj
 *.ply
 !demo/resources/*
+!figure/*
 
 # Resources as exception
 !resources/*
