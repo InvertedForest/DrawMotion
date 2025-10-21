@@ -437,7 +437,8 @@ class ReMoDiffuseTransformer(DiffusionTransformer):
                                  **kwargs):
         B, T = stickman_tracks.shape[0], stickman_tracks.shape[1]
         if xf_out is None:
-            text = [i['text'] for i in kwargs['motion_metas']] # TODO
+            if text is None:
+                text = [i['text'] for i in kwargs['motion_metas']] # TODO
             xf_out = self.encode_text(text, clip_feat, device)
         output = {'xf_out': xf_out}
         if  stickman_emb is None:
