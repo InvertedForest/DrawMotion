@@ -5,10 +5,10 @@ Text-to-motion generation, which translates textual descriptions into human moti
 
 
 ### Demo
-|  |  | | |
-|-------|-------|-------|-------|
+|  |  | |
+|-------|-------|-------|
 | ![](figure/jump.gif) | ![](figure/hand.gif)|![](figure/fight.gif)|
-| ![](figure/zz.gif) | ![](figure/sit.gif)|![](figure/nar.gif)|![](figure/m.gif)||
+| ![](figure/zz.gif) |![](figure/nar.gif)|![](figure/m.gif)|
 
 ### Unreasonable signal (overly large trajectories)
 |  |  | |
