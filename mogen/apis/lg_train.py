@@ -132,7 +132,7 @@ class LgModel(LightningModule):
             ordered_results = ordered_results[:len(self.dataset)]
             print(f'StiSim:{1-evalute_sim(ordered_results, joints_num=joints_num)/evalute_mean(ordered_results, joints_num=joints_num)}')
             print(f'LoDist:{evalute_locus(ordered_results, joints_num=joints_num)}')
-            print(f'traj error:{evalute_trajectory_error(ordered_results, joints_num=joints_num)}')
+            print(f'2D traj error:{evalute_trajectory_error(ordered_results, joints_num=joints_num)}')
             results = self.dataset.evaluate(ordered_results)
             for k, v in results.items():
                 print(f'\n{k} : {v:.4f}')

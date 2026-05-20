@@ -153,3 +153,4 @@ logs/
 
 env.sh
 !figure/**/*.png
+mid_feat/

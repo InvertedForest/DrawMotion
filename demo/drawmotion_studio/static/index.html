@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DrawMotion Studio</title>
+  <link rel="stylesheet" href="/static/styles.css?v=20260520release">
+</head>
+<body>
+  <main class="studio">
+    <section class="left-panel">
+      <header class="topbar">
+        <div>
+          <h1>DrawMotion Studio</h1>
+          <p>Draw a path. Sketch key poses. Generate 3D motion.</p>
+        </div>
+        <a class="github-link" href="https://github.com/InvertedForest/DrawMotion" target="_blank">GitHub</a>
+      </header>
+
+      <div class="prompt-row">
+        <input id="textPrompt" value="A person walks forward." autocomplete="off">
+        <button id="generateBtn">Generate</button>
+      </div>
+
+      <section class="parameter-panel">
+        <div class="surface-header">
+          <strong>Parameters</strong>
+        </div>
+        <div class="parameter-grid">
+          <label class="number-control" for="ifgRepeat">
+            <span>IFG repeat</span>
+            <input id="ifgRepeat" type="number" min="0" max="100" step="1" value="50">
+          </label>
+          <label class="number-control" for="ifgScale">
+            <span>IFG scale</span>
+            <input id="ifgScale" type="number" min="0" max="200" step="1" value="50">
+          </label>
+          <label class="number-control" for="trajectoryAlpha">
+            <span>Alpha</span>
+            <input id="trajectoryAlpha" type="number" min="0" max="1" step="0.05" value="0.2">
+          </label>
+          <label class="number-control" for="trajectoryFrames">
+            <span>Frames</span>
+            <input id="trajectoryFrames" type="number" min="2" max="196" step="1" value="196">
+          </label>
+        </div>
+      </section>
+
+      <div class="canvas-grid">
+        <section class="tool-surface">
+          <div class="surface-header">
+            <strong>Trajectory</strong>
+            <div class="button-row">
+              <label class="scale-control" for="trajectoryScale">
+                <span>Scale</span>
+                <input id="trajectoryScale" type="range" min="0.25" max="2.5" step="0.05" value="1">
+                <output id="trajectoryScaleValue" for="trajectoryScale">1.00x</output>
+              </label>
+              <button id="clearTrajectoryBtn">Clear</button>
+              <button id="exampleMBtn">m</button>
+              <button id="exampleArcBtn">Arc</button>
+              <button id="exampleNarutoBtn">Spiral</button>
+            </div>
+          </div>
+          <canvas id="trajectoryCanvas" width="840" height="420"></canvas>
+        </section>
+
+        <section id="stickmanPanel" class="tool-surface hidden">
+          <div class="surface-header">
+            <strong>Stickman</strong>
+            <div class="button-row">
+              <button id="templateWalkBtn">Walk</button>
+              <button id="templateHandBtn">Hand</button>
+              <button id="clearPoseBtn">Clear</button>
+            </div>
+          </div>
+          <canvas id="poseCanvas" width="320" height="320"></canvas>
+          <div class="pose-controls">
+            <input id="poseTime" type="range" min="0" max="100" value="50">
+            <button id="savePoseBtn">Save Key Pose</button>
+          </div>
+          <div id="keyframeList" class="keyframe-list"></div>
+        </section>
+      </div>
+    </section>
+
+    <section class="right-panel">
+      <div class="viewer-header">
+        <div>
+          <strong>3D Preview</strong>
+          <span id="statusText">ready</span>
+        </div>
+        <div class="button-row">
+          <button id="playPauseBtn">Pause</button>
+          <button id="resetViewBtn">Reset</button>
+        </div>
+      </div>
+      <div id="generationProgress" class="generation-progress hidden" aria-live="polite">
+        <div class="generation-progress-top">
+          <span>Diffusion sampling</span>
+          <span id="generationProgressText">0%</span>
+        </div>
+        <div class="generation-progress-track">
+          <div id="generationProgressBar" class="generation-progress-bar"></div>
+        </div>
+      </div>
+      <div id="viewer"></div>
+      <div class="timeline-row">
+        <input id="progressSlider" type="range" min="0" max="195" value="0" disabled>
+        <div id="progressMarkers" class="progress-markers"></div>
+      </div>
+      <div class="result-row">
+        <span id="frameText">frame 0</span>
+        <span class="legend-item"><span class="legend-swatch legend-input"></span>Input trajectory</span>
+        <span class="legend-item"><span class="legend-swatch legend-generated"></span>Generated trajectory</span>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="/static/app.js?v=20260520release"></script>
+</body>
+</html>

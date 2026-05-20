@@ -13,6 +13,7 @@ import torch.optim as optim
 from abc import ABC, abstractmethod
 import torch.distributed as dist
 
+from mogen.models.utils.statistic import WelfordTool
 from mogen.utils.plot_utils import recover_from_ric, rel_joint_from_ric
 
 
@@ -1267,7 +1268,10 @@ class SpacedDiffusion(GaussianDiffusion):
     def _wrap_model(self, model):
         if isinstance(model, _WrappedModel):
             return model
-        return _WrappedModel(model, self.timestep_map, self.original_num_steps)
+        if not hasattr(self, 'wrap_model'):
+            wrap_model = _WrappedModel(model, self.timestep_map, self.original_num_steps)
+            self.wrap_model = wrap_model
+        return self.wrap_model
 
 
 
@@ -1286,30 +1290,26 @@ class _WrappedModel:
             raise NotImplementedError(self.model.input_feats)
         self.timestep_map = timestep_map
         self.original_num_steps = original_num_steps
-        # torch.save({'miu': step_miu.cpu(), 'sigma': step_sigma.cpu(), 'sigma_inv': sigma_inv}, midquery_path+'/mid_query_ana.pt')
-        path = f'.vscode/mid_query/{dataset}/mid_query_ana.pt' 
-        # path = '.vscode/mid_query/t2m/mid_query_ana.pt' 
-        data = th.load(path, map_location='cpu')
-        self.step_mu = data['miu']
-        self.step_sigma = data['sigma']
-        self.sigma_inv = data['sigma_inv']
-        self.m_steps = data['steps']
-        self.threshold = 1 
+        path = f'mid_feat/{dataset}/mid_feat.pt' 
+        self.threshold = 1
+        self.save_mode = False
+        if not os.path.exists(path):
+            self.save_mode = True
+            print(f'No feature statistics found at {path}, will save mid_feat this time.')
+        self.welford_tool = WelfordTool(save_mode=self.save_mode, path=path, time_steps=self.timestep_map, dims=512)
+        self.step_mu = self.welford_tool.step_mu
+        self.sigma_inv = self.welford_tool.sigma_inv
+        self.m_steps = self.welford_tool.steps
 
     def to(self, x):
-        device = x.device
-        dtype = x.dtype
-        _device = self.step_mu.device
-        _dtype = self.step_mu.dtype
         dim = x.shape[-1]
+        self.welford_tool.to(x)
+        self.step_mu = self.welford_tool.step_mu
+        self.sigma_inv = self.welford_tool.sigma_inv
+        self.m_steps = self.welford_tool.steps
         if not hasattr(self, 'guiance_tool'):
             dataset_name = 'kit_ml' if dim == 251 else 'human_ml3d'
-            self.guiance_tool = SLoss(cfg=dataset_name).to(device)
-        if device != _device or dtype != _dtype:
-            self.step_mu = self.step_mu.to(device=device, dtype=dtype)
-            self.step_sigma = self.step_sigma.to(device=device, dtype=dtype)
-            self.sigma_inv = self.sigma_inv.to(device=device, dtype=dtype)
-            self.m_steps = self.m_steps.to(device=device, dtype=dtype)
+            self.guiance_tool = SLoss(cfg=dataset_name).to(x.device)
 
     def guidance_loss(self, pred_motion, **kwargs):
         # return th.abs(model_out).mean()  # Placeholder for guidance verification
@@ -1321,9 +1321,7 @@ class _WrappedModel:
         gt_locus = kwargs['locus']/scale # [b, T, 2]
         pred_abs_joint = recover_from_ric(pred_motion.float(), joints_num=joints_num, ifnorm=True) # [B, T, J, 3]
         pred_locus = pred_abs_joint[:, :, 0, [0,2]]/scale # [B, T, 2]
-        # locus_loss = ((pred_locus - gt_locus) * motion_mask[..., None]).abs().mean(dim=(1,2)).sum() # * motion_mask.sum()
-        # locus_loss = ((pred_locus - gt_locus) * motion_mask[..., None]).pow(2).mean(dim=(1,2)).sum() # * motion_mask.sum() or sqrt TODO
-        locus_loss = ((pred_locus - gt_locus) * motion_mask[..., None]).pow(2).sum(-1).add(1e-8).sqrt().mean(-1).sum() # * motion_mask.sum() or sqrt 
+        locus_loss = ((pred_locus - gt_locus) * motion_mask[..., None]).pow(2).sum(-1).add(1e-8).sqrt().mean(-1).sum()
 
         # # stickman
         # stick_mask = (kwargs['stick_mask'][...,0] == 1) # [b, T, 1]
@@ -1351,15 +1349,17 @@ class _WrappedModel:
         cur_step = new_ts[0].item()
         guidance = kwargs['guidance']
         # guidance.manual = False
+        if self.save_mode:
+                h, mid_query = self.model(x, new_ts, mid_res=-1, **kwargs)  # Get initial model output
+                self.welford_tool.update(mid_query.reshape(-1, mid_query.shape[-1]), cur_step)
+                model_out = self.model(x, new_ts, mid_res=(h, mid_query),  **kwargs)
+                return model_out
         if guidance.repeat == 0:
             return self.model(x, new_ts, **kwargs)
         else:
             with th.no_grad():
                 h, mid_query = self.model(x, new_ts, mid_res=-1, **kwargs)  # Get initial model output
                 ori_mid_query = mid_query.detach().clone()
-                # repeat, scale = 1, 0
-                # np.save(f'.vscode/mid_query/kit/{cur_step}_{np.random.randint(10000)}.npy', mid_query.detach().cpu().numpy())
-                # np.save(f'.vscode/mid_query/t2m/{cur_step}_{np.random.randint(10000)}.npy', mid_query.detach().cpu().numpy())
                 if (self.m_steps == cur_step).sum().item() != 1:
                     raise ValueError(f'cur_step {cur_step} not in m_steps {self.m_steps}')
                 index = th.where(self.m_steps==cur_step)[0].item()
@@ -1371,43 +1371,25 @@ class _WrappedModel:
                 ori_d_M = ((diff @ sigma_inv) * diff).sum(-1).sqrt()    
                 
 
-            if not guidance.manual:
-                mid_query = th.nn.Parameter(mid_query.detach().clone(), requires_grad=True)
-                optimizer = th.optim.SGD([mid_query], lr=guidance.scale)
+            h = h.detach().clone()
+            h.requires_grad_(False)
             for i in range(guidance.repeat):
                 with th.enable_grad():
-                    if guidance.manual:
-                        mid_query = mid_query.detach().clone()
-                        mid_query.requires_grad_(True)
-                        h = h.detach().clone()
-                        h.requires_grad_(False)
-                    else:
-                        optimizer.zero_grad()
+                    mid_query = mid_query.detach()
+                    mid_query.requires_grad_(True)
                     _model_out = self.model(x, new_ts, mid_res=(h, mid_query),  **kwargs)
                     loss = self.guidance_loss(_model_out, **kwargs)
-                    # loss.backward()
-                    if guidance.manual:
-                        mid_query_grad = th.autograd.grad(loss, mid_query, retain_graph=False)[0]
-                        if False:
-                        # if True:
-                            # print(f'{cur_step} {i} {mid_query.mean().item():e} {mid_query.std().item():e} {mid_query.grad.mean().item():e} {mid_query.grad.std().item():e}', file=open('mean.txt', 'a'))
-                            print(f'{cur_step} {i} {mid_query.mean().item():e} {mid_query.std().item():e} {mid_query_grad.abs().mean().item():e} {mid_query_grad.abs().std().item():e} {loss.item():e}', file=open(f'.vscode/vis/dist{guidance.repeat}_{guidance.layer_num}_{guidance.scale}.txt', 'a'))
-                        mid_query = mid_query - mid_query_grad * guidance.scale
-                        mid_query = mid_query.detach().clone()
-                        mid_query.requires_grad_(False)
-                        grad = mid_query - ori_mid_query
-                        diff = mid_query - mu
-                        d_M = ((diff @ sigma_inv) * diff).sum(-1).sqrt()    
-                        _lambda = 0.01
-                        d_M_mask = ((d_M-ori_d_M) < self.threshold) * (1 - _lambda) + _lambda
-                        mid_query = ori_mid_query + grad * d_M_mask[..., None]
-                    else:
-                        loss.backward()
-                        if False:
-                        # if True:
-                            # print(f'{cur_step} {i} {mid_query.mean().item():e} {mid_query.std().item():e} {mid_query.grad.mean().item():e} {mid_query.grad.std().item():e}', file=open('mean.txt', 'a'))
-                            print(f'{cur_step} {i} {mid_query.mean().item():e} {mid_query.std().item():e} {mid_query.grad.abs().mean().item():e} {mid_query.grad.abs().std().item():e} {loss.item():e}', file=open(f'.vscode/vis/dist{guidance.repeat}_{guidance.layer_num}_{guidance.scale}.txt', 'a'))
-                        optimizer.step()
+                    mid_query_grad = th.autograd.grad(loss, mid_query, retain_graph=False)[0]
+                with th.no_grad():
+                    mid_query -= mid_query_grad * guidance.scale
+                    grad = mid_query - ori_mid_query
+                    diff = mid_query - mu
+                    d_M = ((diff @ sigma_inv) * diff).sum(-1).sqrt()    
+                    _lambda = 0.01
+                    d_M_mask = ((d_M-ori_d_M) < self.threshold) * (1 - _lambda) + _lambda
+                    # grad = grad.to(dtype=th.float16)
+                    # d_M_mask = d_M_mask.to(dtype=th.float16)
+                    mid_query = ori_mid_query + grad * d_M_mask[..., None]
             with th.no_grad():
                 model_out = self.model(x, new_ts, mid_res=(h, mid_query), **kwargs)
             # clean cuda memory
@@ -1415,9 +1397,3 @@ class _WrappedModel:
             th.cuda.empty_cache()
                 
             return model_out
-'''
-                
-mid_query = mid_query + mid_query_grad * 100 #guidance.scale
-with th.no_grad():
-    model_out = self.model(x, new_ts, mid_res=(h, mid_query), **kwargs) # TODO. detact update_res and forward
-'''

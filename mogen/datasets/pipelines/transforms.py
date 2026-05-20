@@ -60,7 +60,8 @@ class Crop(object):
         motion = results['motion']
         length = len(motion)
         if length >= self.crop_size:
-            idx = random.randint(0, length - self.crop_size)
+            # idx = random.randint(0, length - self.crop_size)
+            idx = 0
             motion = motion[idx: idx + self.crop_size]
             results['motion_length'] = self.crop_size
         else:

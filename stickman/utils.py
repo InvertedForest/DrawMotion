@@ -415,6 +415,27 @@ class StickMan:
         spine_track = self.noise_align(spine_joint)
         return spine_track
 
+    def random_limb(self, limb_joint, rotate_std=0.18, scale_range=0.12, bend_ratio=0.12):
+        root = limb_joint[0].copy()
+        out = [root]
+        for vector in limb_joint[1:] - limb_joint[:-1]:
+            angle = np.random.normal(0, rotate_std)
+            scale = 1 + np.random.uniform(-scale_range, scale_range)
+            cos_a = np.cos(angle)
+            sin_a = np.sin(angle)
+            rotated = np.array([
+                cos_a * vector[0] - sin_a * vector[1],
+                sin_a * vector[0] + cos_a * vector[1]
+            ]) * scale
+            out.append(out[-1] + rotated)
+        out = np.asarray(out)
+
+        direction = out[-1] - out[0]
+        norm = max(np.linalg.norm(direction), 1e-6)
+        normal = np.array([-direction[1], direction[0]]) / norm
+        out[1] += normal * np.random.uniform(-bend_ratio, bend_ratio) * norm
+        return out
+
     
     def draw_limb(self):
         # arm 
@@ -426,6 +447,7 @@ class StickMan:
         human_bias = 0
         limb_joint[1] =  human_bias * limb_joint[0] + (1-human_bias) * limb_joint[1]
         limb_joint = limb_joint[1:]
+        # limb_joint = self.random_limb(limb_joint)
 
 
         limb_track = self.noise_align(limb_joint)

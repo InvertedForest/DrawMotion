@@ -41,15 +41,10 @@ def parse_args():
     return args
 
 def parse_gpu(gpu):
-    if gpu == '-1':
-        return [0, 1, 2, 3]
-    elif gpu == '-2':
-        return [4, 5, 6, 7]
-    else:
-        try:
-            return eval(f'[{gpu}]')
-        except:
-            raise ValueError(f'gpu format error: {gpu}')
+    try:
+        return eval(f'[{gpu}]')
+    except:
+        raise ValueError(f'gpu format error: {gpu}')
 
 def collate_fn(batch):
     keys = batch[0].keys()
@@ -110,5 +105,5 @@ if __name__ == '__main__':
     main()
 
 
-# python tools/lg_test.py /root/StickMotion/logs/kit_ml/tp_attn3/last.ckpt -1
+# python tools/lg_test.py /root/StickMotion/logs/kit_ml/last.ckpt -1
 # python  tools/lg_test.py  /root/StickMotion/logs/human_ml3d/tp_attn3_cond_locus/last.ckpt -1
