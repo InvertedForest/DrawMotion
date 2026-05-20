@@ -149,3 +149,24 @@ Then open `http://<server>:12008` in a browser. The model is loaded lazily on th
 - `IFG scale`: training-free guidance strength.
 
 Use the full dataset preparation instructions only if you want to train models, recompute IFG statistics, or run quantitative evaluation.
+
+## Discussion
+
+Recent systems such as [Kimodo](https://research.nvidia.com/labs/sil/projects/kimodo/) also support controllable motion generation with text and kinematic constraints. A key difference is the motion representation: Kimodo uses a smoothed global root trajectory together with global joint positions/rotations, so path constraints can be imposed more directly in absolute coordinates. DrawMotion follows the widely used HumanML3D-style local-relative representation, where the root trajectory is encoded through incremental velocity features and recovered by integration. Applying freehand trajectory control under this indirect representation is therefore a stricter setting for spatial guidance.
+
+The proposed IFG strategy is not limited to human motion generation. It can be applied to other diffusion-based generation tasks when intermediate conditional features are available and a differentiable condition error can be defined, enabling training-free refinement without retraining the denoising model.
+
+## Citation
+
+If you find DrawMotion useful, please cite:
+
+```bibtex
+@article{wang2026drawmotion,
+  title={DrawMotion: Generating 3D Human Motions by Freehand Drawing},
+  author={Wang, Tao and Jin, Lei and Wu, Zhihua and He, Qiaozhi and Chu, Jiaming and Cheng, Yu and Xing, Junliang and Zhao, Jian and Yan, Shuicheng and Wang, Li},
+  journal={IEEE Transactions on Pattern Analysis and Machine Intelligence},
+  year={2026},
+  pages={1--17},
+  doi={10.1109/TPAMI.2026.3679530}
+}
+```
