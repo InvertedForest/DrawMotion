@@ -1,5 +1,10 @@
  # DrawMotion: Generating 3D Human Motions by Freehand Drawing
 
+<p align="center">
+  <a href="https://doi.org/10.48550/arXiv.2605.20955">Paper (arXiv)</a> |
+  <a href="https://youtu.be/sy2QTdDD09A">Demo Video</a>
+</p>
+
 
 <p align="center">
   <a href="https://youtu.be/sy2QTdDD09A">
@@ -28,7 +33,7 @@ Text-to-motion generation, which translates textual descriptions into human moti
 - Training and evaluation code on both KIT-ML and HumanML3D datasets.
 
 ### Note
-- We fixed a training/evaluation bug and obtained improved quantitative scores. The revised arXiv version is under review.
+- We fixed a training/evaluation bug and obtained improved quantitative scores; please refer to the arXiv version for the exact numbers.
 - The current public demo exposes text and trajectory control only. A stickman-conditioned version is coming soon.
 - The current stickman drawing order is head -> spine -> right arm -> left arm -> right leg -> left leg. This order follows natural drawing habits and helps the stickman representation distinguish left from right.
 
