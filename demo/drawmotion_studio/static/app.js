@@ -177,6 +177,16 @@ function failGenerationProgress(message = "generation failed") {
   generateBtn.disabled = false;
 }
 
+async function readResponseError(response) {
+  const contentType = response.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) {
+    const errorData = await response.json();
+    return errorData.detail || response.statusText;
+  }
+  const text = await response.text();
+  return text.trim() || response.statusText;
+}
+
 function drawFramePath(ctx, points, evenColor, oddColor, width) {
   if (points.length < 2) return;
   ctx.lineWidth = width;
@@ -742,8 +752,7 @@ generateBtn.addEventListener("click", async () => {
       body: JSON.stringify(payload)
     });
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.detail);
+      throw new Error(await readResponseError(response));
     }
     const data = await response.json();
     loadResult(data);

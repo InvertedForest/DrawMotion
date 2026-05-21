@@ -55,6 +55,9 @@ hf download I0u0I/DrawMotion \
   --include "logs/human_ml3d/last.ckpt" \
             "mid_feat/t2m/mid_feat.pt" \
             "stickman/weight/real_init/t2m/stickman_encoder.ckpt"
+
+# Download the OpenAI CLIP text encoder used by DrawMotion.
+python -c 'import clip; clip.load("ViT-B/32", device="cpu")'
 ```
 
 For training or quantitative evaluation, also prepare the HumanML3D/KIT-ML data following [ReMoDiffuse](https://github.com/mingyuan-zhang/ReMoDiffuse#:~:text=r%20requirements.txt-,Data%20Preparation,-Download%20data%20files).
@@ -147,11 +150,15 @@ Then open `http://<server>:12008` in a browser. The model is loaded lazily on th
 
 - `Text`: global motion semantics.
 - `Trajectory`: hand-drawn pelvis/root path.
-- `Scale`: trajectory size multiplier.
+- `Trajectory scale`: trajectory size multiplier.
 - `Frames`: generated motion length, from `2` to `196`.
 - `Alpha`: trajectory resampling; `0` is uniform by arc length, larger values preserve more drawing speed.
 - `IFG repeat`: training-free guidance refinement steps.
 - `IFG scale`: training-free guidance strength.
+
+If the character moves unnaturally, the drawn trajectory may be physically hard to follow;
+try lowering `Trajectory scale` or `Alpha`. If the generated path does not fit the input
+trajectory closely enough, increase `IFG repeat`, for example to `100`, and tune `IFG scale` if needed.
 
 Use the full dataset preparation instructions only if you want to train models, recompute IFG statistics, or run quantitative evaluation.
 
