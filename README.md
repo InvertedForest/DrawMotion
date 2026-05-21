@@ -7,9 +7,7 @@
 
 
 <p align="center">
-  <a href="https://youtu.be/sy2QTdDD09A">
-    <img src="https://img.youtube.com/vi/sy2QTdDD09A/sddefault.jpg" alt="DrawMotion YouTube demo" width="50%">
-  </a>
+  <img src="figure/demo.gif" alt="DrawMotion web demo" width="70%">
 </p>
 
 
