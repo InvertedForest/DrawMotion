@@ -44,7 +44,7 @@ pip install -r requirements.txt
 ```
 
 ### Prepare Weights and Data
-For the web demo, download the required model assets from [Hugging Face](https://huggingface.co/I0u0I/DrawMotion). Dataset downloads are not required for the demo.
+Download the public HumanML3D/T2M and KIT-ML model assets from [Hugging Face](https://huggingface.co/I0u0I/DrawMotion). Dataset downloads are not required for the web demo.
 
 ```bash
 pip install -U huggingface_hub
@@ -52,7 +52,10 @@ hf download I0u0I/DrawMotion \
   --local-dir . \
   --include "logs/human_ml3d/last.ckpt" \
             "mid_feat/t2m/mid_feat.pt" \
-            "stickman/weight/real_init/t2m/stickman_encoder.ckpt"
+            "stickman/weight/real_init/t2m/stickman_encoder.ckpt" \
+            "logs/kit_ml/last.ckpt" \
+            "mid_feat/kit/mid_feat.pt" \
+            "stickman/weight/kit_ml/split_weight/stickman_encoder.ckpt"
 
 # Download the OpenAI CLIP text encoder used by DrawMotion.
 python -c 'import clip; clip.load("ViT-B/32", device="cpu")'
@@ -74,7 +77,9 @@ DrawMotion
 │   ├── human_ml3d
 │   └── kit_ml
 ├── mid_feat
-│   └── t2m
+│   ├── t2m
+│   │   └── mid_feat.pt
+│   └── kit
 │       └── mid_feat.pt
 └── data [1]
     ├── database
