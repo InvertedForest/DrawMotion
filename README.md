@@ -1,4 +1,4 @@
- # DrawMotion: Generating 3D Human Motions by Freehand Drawing
+ # DrawMotion: Generating 3D Human Motions by Freehand Drawing | TPAMI 2026
 
 <p align="center">
   <a href="https://doi.org/10.48550/arXiv.2605.20955">Paper (arXiv)</a> |
